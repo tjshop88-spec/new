@@ -145,6 +145,42 @@
         .radio-input:checked + span { color: #00c300; font-weight: bold; }
         #address-row { display: none; }
 
+        /* 優惠券區塊 */
+        .coupon-section {
+            background-color: #f1f8e9;
+            border: 2px dashed #81c784;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .coupon-banner {
+            display: block;
+            width: 100%;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .coupon-input-group {
+            display: flex;
+            gap: 10px;
+        }
+        .coupon-btn {
+            background-color: #2e7d32;
+            color: white;
+            border: none;
+            padding: 0 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        #coupon-msg {
+            font-size: 0.85rem;
+            margin-top: 8px;
+            font-weight: bold;
+        }
+
         /* 資訊區塊 (自取/宅配) */
         .info-box {
             padding: 15px;
@@ -192,6 +228,7 @@
         .receipt-card { background: #f9f9f9; border-radius: 10px; padding: 15px; text-align: left; margin-bottom: 20px; border: 1px dashed #ddd; }
         .receipt-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
         .receipt-row.bold { font-weight: bold; border-top: 1px solid #ddd; padding-top: 10px; margin-top: 10px; font-size: 1.1rem; }
+        .receipt-row.discount-row { color: #d63031; }
         
         .receipt-bank-box { background: #e8f5e9; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: left; border: 1px solid #c8e6c9; }
         .bank-title { color: #2e7d32; font-weight: bold; margin-bottom: 5px; font-size: 0.9rem; }
@@ -315,6 +352,19 @@
             <div class="section-header">訂購資訊</div>
             <div class="options-section">
                 
+                <div class="coupon-section">
+                    <a href="https://lin.ee/UHEkfgW" target="_blank">
+                        <img src="line_promo.jpg" alt="加入LINE好友領取優惠" class="coupon-banner">
+                    </a>
+                    
+                    <label class="form-label" style="color:#2e7d32;">🎉 使用折扣碼 (從 LINE 取得)</label>
+                    <div class="coupon-input-group">
+                        <input type="text" id="coupon-code" class="form-input" placeholder="請輸入折扣碼">
+                        <button type="button" class="coupon-btn" onclick="applyCoupon()">兌換</button>
+                    </div>
+                    <div id="coupon-msg"></div>
+                </div>
+
                 <div class="form-label" style="margin-bottom:8px;">取貨方式</div>
                 <div class="radio-group">
                     <label class="radio-label">
@@ -427,6 +477,11 @@
                 食品登錄字號: N-194427773-00000-4<br>
                 已投保 國泰產險 產品責任險<br><br>
                 
+                <span id="busuanzi_container_site_pv" style="display:none;">
+                    累積瀏覽人次：<span id="busuanzi_value_site_pv"></span>
+                </span>
+                <br><br>
+
                 <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
                     <a href="https://lin.ee/UHEkfgW" target="_blank" class="line-btn-style">
                         💬 點擊加入官方 LINE
@@ -515,6 +570,9 @@
     <script>
         // --- 設定區 ---
         
+        // ★★★ 請務必確認這裡的網址已填入您的 Apps Script 網址 (如果沒有要流量統計可留空) ★★★
+        const TRAFFIC_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9_YOUR_ID_HERE/exec"; 
+        
         // Google Form 回傳網址
         const GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSenpCJdVZWJ4seiaz4GimXwasppPbnX3o1pLGyrnIMWaJ_sqw/formResponse";
         
@@ -532,7 +590,8 @@
             shipping:     "entry.1750953999", 
             totalPrice:   "entry.816848611",
             remarks:      "entry.370850133",  
-            orderId:      "entry.846286532"   
+            orderId:      "entry.846286532",
+            discountAmount: "entry.1977990591" // ★ 新增折扣金額欄位
         };
 
         // LINE Pay 連結
@@ -552,7 +611,15 @@
             { id: 10, name: "十薰茉綠 (限定口味)", price: 50, image: "230243.jpg", desc: "茉莉花香與綠茶柔和交織，淡雅茶韻，搭配滑順奶酪。" }
         ];
 
+        // 優惠券設定
+        const COUPONS = {
+            "VIP95": { type: "rate", value: 0.95, name: "好酪友95折" },
+            "LINE50": { type: "minus", value: 50, name: "好友現折50" }
+        };
+
         let cart = []; 
+        let appliedCoupon = null; // 紀錄目前使用的優惠券
+
         const menuContainer = document.getElementById('menu-list');
         const cartContainer = document.getElementById('cart-list');
         const totalEl = document.getElementById('final-total');
@@ -560,6 +627,9 @@
         const loadingOverlay = document.getElementById('loading-overlay');
 
         function init() {
+            // 流量統計
+            logVisit();
+
             menuContainer.innerHTML = '';
             menuData.forEach(item => {
                 const div = document.createElement('div');
@@ -577,6 +647,17 @@
             renderCart();
         }
 
+        // 流量統計函數
+        function logVisit() {
+            if(!TRAFFIC_SCRIPT_URL || TRAFFIC_SCRIPT_URL.includes("YOUR_ID_HERE")) return;
+
+            fetch(TRAFFIC_SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors", 
+                body: JSON.stringify({ action: "view" }) 
+            }).catch(err => console.log("Tracking log error (safe to ignore)"));
+        }
+
         function updateDateSettings(mode) {
             const selectEl = document.getElementById('pickup-slot-select');
             const deliveryText = document.getElementById('delivery-date-text');
@@ -589,7 +670,6 @@
             const currentHour = now.getHours();
 
             if (mode === 'delivery') {
-                // 宅配模式
                 selectEl.style.display = 'none';
                 deliveryText.style.display = 'block';
                 hint.innerText = "提醒：宅配默認不指定日期出貨，若需指定日期請先與店家詢問。";
@@ -597,7 +677,6 @@
                 pickupInfoBox.style.display = 'none'; 
                 deliveryInfoBox.style.display = 'block'; 
             } else {
-                // 自取模式
                 selectEl.style.display = 'block';
                 deliveryText.style.display = 'none';
                 addressRow.style.display = 'none';
@@ -621,7 +700,6 @@
             let startDate = new Date(now);
             startDate.setDate(startDate.getDate() + startDays);
             
-            // 產生 30 天內的有效選項
             for(let i=0; i<30; i++) {
                 let current = new Date(startDate);
                 current.setDate(startDate.getDate() + i);
@@ -633,7 +711,6 @@
                 let dateStr = `${month}/${date} (週${dayStr})`;
                 let fullDateStr = `${current.getFullYear()}/${String(month).padStart(2,'0')}/${String(date).padStart(2,'0')} (${dayStr})`;
 
-                // ★邏輯：週二(2) 到 週五(5) -> 兩個時段 (12:00~13:00 / 17:00~18:00)
                 if (day >= 2 && day <= 5) {
                     let opt1 = document.createElement('option');
                     opt1.value = `${fullDateStr} 12:00~13:00`;
@@ -645,7 +722,6 @@
                     opt2.innerText = `${dateStr} 17:00~18:00`;
                     select.appendChild(opt2);
                 }
-                // ★邏輯：週六(6) -> 一個時段
                 else if (day === 6) {
                     let opt3 = document.createElement('option');
                     opt3.value = `${fullDateStr} 10:00~12:00`;
@@ -684,9 +760,34 @@
             else cart.push({ ...menuData.find(p => p.id === id), quantity: 1 });
             
             // Google Ads Conversion
-           
+            gtag('event', 'conversion', {'send_to': 'AW-17855729381/CJdUcKeW794bEOwDo8JC'});
 
             renderCart();
+        }
+
+        // 應用優惠券功能
+        function applyCoupon() {
+            const input = document.getElementById('coupon-code');
+            const msg = document.getElementById('coupon-msg');
+            const code = input.value.trim().toUpperCase();
+
+            if (!code) {
+                msg.innerText = "請輸入優惠碼";
+                msg.style.color = "red";
+                return;
+            }
+
+            if (COUPONS[code]) {
+                appliedCoupon = { code: code, ...COUPONS[code] };
+                msg.innerText = "✅ 優惠碼已套用！";
+                msg.style.color = "green";
+                renderCart(); // 重新計算價格
+            } else {
+                appliedCoupon = null;
+                msg.innerText = "❌ 無效的優惠碼";
+                msg.style.color = "red";
+                renderCart();
+            }
         }
 
         function renderCart() {
@@ -732,20 +833,39 @@
             
             document.getElementById('total-cups-badge').innerText = totalCups;
 
-            if (rawTotal >= 5000) {
-                let discountedPrice = Math.floor(rawTotal * 0.9);
-                totalEl.innerText = discountedPrice.toLocaleString();
-                discountBadge.style.display = 'inline-block'; 
-                discountBadge.innerText = '9折';
-            } else if (rawTotal >= 3000) {
-                let discountedPrice = Math.floor(rawTotal * 0.95);
-                totalEl.innerText = discountedPrice.toLocaleString();
-                discountBadge.style.display = 'inline-block'; 
-                discountBadge.innerText = '95折';
+            // 計算最終價格邏輯
+            let finalPrice = rawTotal;
+            let discountText = "";
+
+            if (appliedCoupon) {
+                // 有優惠券，強制套用，不顯示滿額標籤以免混淆
+                discountBadge.style.display = 'inline-block';
+                discountBadge.innerText = '券';
+                
+                if (appliedCoupon.type === 'rate') {
+                    finalPrice = Math.floor(rawTotal * appliedCoupon.value);
+                } else if (appliedCoupon.type === 'minus') {
+                    finalPrice = rawTotal - appliedCoupon.value;
+                }
             } else {
-                totalEl.innerText = rawTotal.toLocaleString();
-                discountBadge.style.display = 'none';
+                // 沒有優惠券，檢查滿額
+                if (rawTotal >= 5000) {
+                    finalPrice = Math.floor(rawTotal * 0.9);
+                    discountBadge.style.display = 'inline-block'; 
+                    discountBadge.innerText = '9折';
+                } else if (rawTotal >= 3000) {
+                    finalPrice = Math.floor(rawTotal * 0.95);
+                    discountBadge.style.display = 'inline-block'; 
+                    discountBadge.innerText = '95折';
+                } else {
+                    discountBadge.style.display = 'none';
+                }
             }
+
+            // 防止負數
+            if (finalPrice < 0) finalPrice = 0;
+
+            totalEl.innerText = finalPrice.toLocaleString();
         }
 
         function changeQty(index, delta) {
@@ -790,7 +910,10 @@
             cart.forEach(p => {
                 rawTotal += p.price * p.quantity;
                 totalCups += p.quantity;
-                orderDetails += `${p.name}x${p.quantity}, `;
+                
+                // ★ 純淨版訂單明細：只保留「品項數量」與「逗號」
+                orderDetails += `${p.name}x${p.quantity}, `; 
+                
                 msgDetails += `- ${p.name} x ${p.quantity} = $${p.price*p.quantity}\n`;
             });
             
@@ -799,34 +922,49 @@
                 return; 
             }
 
+            // 計算最終金額 (傳送給後端的資料 + 顯示給客人看)
             let productFinalPrice = rawTotal;
-            let discountText = "";
-            if (rawTotal >= 5000) {
-                productFinalPrice = Math.floor(rawTotal * 0.9);
-                orderDetails += `(滿額9折)`;
-                discountText = "(商品已折 10%)";
-            } else if (rawTotal >= 3000) {
-                productFinalPrice = Math.floor(rawTotal * 0.95);
-                orderDetails += `(滿額95折)`;
-                discountText = "(商品已折 5%)";
+            let discountName = "";
+            let discountAmount = 0;
+
+            if (appliedCoupon) {
+                let original = rawTotal;
+                if (appliedCoupon.type === 'rate') {
+                    productFinalPrice = Math.floor(rawTotal * appliedCoupon.value);
+                    discountName = appliedCoupon.name; 
+                } else if (appliedCoupon.type === 'minus') {
+                    productFinalPrice = rawTotal - appliedCoupon.value;
+                    discountName = appliedCoupon.name;
+                }
+                discountAmount = original - productFinalPrice;
+            } else {
+                if (rawTotal >= 5000) {
+                    productFinalPrice = Math.floor(rawTotal * 0.9);
+                    discountName = "滿額9折";
+                    discountAmount = rawTotal - productFinalPrice;
+                } else if (rawTotal >= 3000) {
+                    productFinalPrice = Math.floor(rawTotal * 0.95);
+                    discountName = "滿額95折";
+                    discountAmount = rawTotal - productFinalPrice;
+                }
             }
 
-            // 宅配運費邏輯 (以「盒」計算)
+            // 宅配運費
             let shippingFee = 0;
             if (delivery === '宅配') {
                 const boxes = totalCups / 6; 
                 if(boxes <= 2) {
-                    shippingFee = 130; // 1-2盒
+                    shippingFee = 130; 
                 } else if (boxes <= 8) {
-                    shippingFee = 170; // 3-8盒
+                    shippingFee = 170; 
                 } else {
-                    shippingFee = 210; // 9盒以上
+                    shippingFee = 210; 
                 }
             }
 
             let finalAllPrice = productFinalPrice + shippingFee;
 
-            // ★ 生成純數字的訂單編號 (YYYYMMDDHHMMSS)
+            // ★ 生成純數字訂單編號
             const now = new Date();
             const yyyy = now.getFullYear();
             const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -834,31 +972,36 @@
             const hh = String(now.getHours()).padStart(2, '0');
             const min = String(now.getMinutes()).padStart(2, '0');
             const sec = String(now.getSeconds()).padStart(2, '0');
-            
-            // 格式：20260208153000
             const orderId = `${yyyy}${mm}${dd}${hh}${min}${sec}`;
 
-            let confirmMsg = `【訂單編號：${orderId}】\n---------------------\n`;
-            confirmMsg += `總數量：${totalCups} 個\n`;
-            confirmMsg += msgDetails;
+            // ★★★ 詳細結帳小跳窗 (Popup) ★★★
+            let confirmMsg = `【訂單確認】\n`;
             confirmMsg += `---------------------\n`;
-            if(discountText) confirmMsg += `商品小計：$${productFinalPrice} ${discountText}\n`;
-            else confirmMsg += `商品小計：$${productFinalPrice}\n`;
+            confirmMsg += `商品原價：$${rawTotal}\n`;
             
-            if(shippingFee > 0) confirmMsg += `運費：$${shippingFee} (新竹物流冷藏)\n`;
+            if (discountAmount > 0) {
+                confirmMsg += `折扣優惠：-$${discountAmount} (${discountName})\n`;
+            }
             
-            confirmMsg += `===============\n`;
-            confirmMsg += `合計總金額：$${finalAllPrice}\n`;
-            confirmMsg += `===============\n`;
-            confirmMsg += `取貨：${delivery}\n`;
+            if (shippingFee > 0) {
+                confirmMsg += `運費小計：$${shippingFee} (低溫宅配)\n`;
+            } else {
+                confirmMsg += `運費小計：$0 (${delivery})\n`;
+            }
+
+            confirmMsg += `---------------------\n`;
+            confirmMsg += `應付總額：$${finalAllPrice}\n`;
+            confirmMsg += `---------------------\n`;
+            
+            confirmMsg += `取貨方式：${delivery}\n`;
             confirmMsg += `日期：${finalDateStr}\n`; 
-            
             confirmMsg += `姓名：${name}\n`;
             confirmMsg += `電話：${phone}\n`;
             if(delivery === '宅配') confirmMsg += `地址：${fullAddress}\n`;
             if(remarks) confirmMsg += `備註：${remarks}\n`;
-            confirmMsg += `付款：${payment === 'linepay' ? 'LINE Pay' : '銀行匯款'}\n`;
-            confirmMsg += `\n請確認資料無誤，點擊「確定」送出訂單。`;
+            confirmMsg += `付款方式：${payment === 'linepay' ? 'LINE Pay' : '銀行匯款'}\n`;
+            
+            confirmMsg += `\n請確認以上資訊無誤，點擊「確定」送出訂單。`;
 
             if (!confirm(confirmMsg)) {
                 return; 
@@ -867,7 +1010,7 @@
             loadingOverlay.style.display = 'flex';
             document.getElementById('submit-btn').disabled = true;
 
-            // ★ 修正：訂單明細字串 (不含訂單編號，保持乾淨)
+            // ★ 修正：訂單明細字串 (純淨版，只含品項數量) + 杯數
             let fullOrderInfo = orderDetails + ` [共${totalCups}個]`;
             if(shippingFee > 0) fullOrderInfo += ` [運費$${shippingFee}]`;
 
@@ -884,17 +1027,15 @@
             formData.append(FORM_FIELDS.shipping, shippingFee);        
             formData.append(FORM_FIELDS.totalPrice, finalAllPrice);
             formData.append(FORM_FIELDS.remarks, remarks);
-            formData.append(FORM_FIELDS.orderId, orderId); // ★ 這裡將訂單編號送出到獨立欄位
+            formData.append(FORM_FIELDS.orderId, orderId); 
+            formData.append(FORM_FIELDS.discountAmount, discountAmount); 
 
             fetch(GOOGLE_FORM_URL, {
                 method: "POST",
                 body: formData,
                 mode: "no-cors"
             }).then(() => {
-                // ★★★ 放在這裡才是對的！只有訂單送出成功才算轉換 ★★★
-                gtag('event', 'conversion', {'send_to': 'AW-17855729381/CJdUcKeW794bEOwDo8JC'});
-
-                showReceipt(name, phone, finalDateStr, delivery, payment, fullAddress, finalAllPrice, totalCups, shippingFee, remarks, orderId);
+                showReceipt(name, phone, finalDateStr, delivery, payment, fullAddress, finalAllPrice, totalCups, shippingFee, remarks, orderId, rawTotal, discountAmount, discountName);
                 loadingOverlay.style.display = 'none';
             }).catch(err => {
                 alert("訂單傳送失敗，請檢查網路或稍後再試。\n" + err);
@@ -903,20 +1044,32 @@
             });
         }
 
-        function showReceipt(name, phone, dateStr, delivery, payment, fullAddress, finalAllPrice, totalCups, shippingFee, remarks, orderId) {
+        // 修改 showReceipt 接收更多參數，以顯示詳細明細
+        function showReceipt(name, phone, dateStr, delivery, payment, fullAddress, finalAllPrice, totalCups, shippingFee, remarks, orderId, rawTotal, discountAmount, discountName) {
             const now = new Date();
             document.getElementById('receipt-time').innerText = "訂單時間：" + now.toLocaleString('zh-TW', {hour12: false});
-            
-            // 顯示訂單編號
             document.getElementById('receipt-order-id').innerText = orderId;
 
             let itemsHtml = '';
             cart.forEach(p => {
                 itemsHtml += `<div class="receipt-row"><span>${p.name} x ${p.quantity}</span><span>$${p.price * p.quantity}</span></div>`;
             });
-            if(shippingFee > 0) {
-                itemsHtml += `<div class="receipt-row bold" style="border-top:none; margin-top:5px; font-size:0.95rem;"><span>運費 (新竹物流)</span><span>$${shippingFee}</span></div>`;
+            
+            // --- 新增：結帳明細區塊 ---
+            itemsHtml += `<hr style="border:0; border-top:1px dashed #ddd; margin:15px 0;">`;
+            itemsHtml += `<div class="receipt-row"><span>商品小計</span><span>$${rawTotal}</span></div>`;
+            
+            if (discountAmount > 0) {
+                itemsHtml += `<div class="receipt-row discount-row"><span>${discountName}</span><span>-$${discountAmount}</span></div>`;
             }
+            
+            if (shippingFee > 0) {
+                itemsHtml += `<div class="receipt-row"><span>運費 (新竹物流)</span><span>$${shippingFee}</span></div>`;
+            } else {
+                itemsHtml += `<div class="receipt-row"><span>運費 (${delivery})</span><span>$0</span></div>`;
+            }
+            // -------------------------
+
             document.getElementById('receipt-items').innerHTML = itemsHtml;
             document.getElementById('receipt-total').innerText = "NT$ " + finalAllPrice;
 
@@ -962,4 +1115,3 @@
     </script>
 </body>
 </html>
-
