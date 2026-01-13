@@ -278,7 +278,7 @@
 
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <div>正在傳送訂單...</div>
+        <div id="loading-text">正在傳送訂單...</div>
     </div>
 
     <div id="shop-view">
@@ -570,8 +570,8 @@
     <script>
         // --- 設定區 ---
         
-        // ★★★ 請務必確認這裡的網址已填入您的 Apps Script 網址 (如果沒有要流量統計可留空) ★★★
-        const TRAFFIC_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9_YOUR_ID_HERE/exec"; 
+        // ★★★ 已更新為您提供的 Apps Script 網址 ★★★
+        const TRAFFIC_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxR8_vSNcZ_R7NjG3lnYweXVn1IAiOc1jk1hGcfZHEk4uPuU1WKHaFdFIEJ5B18SmI/exec"; 
         
         // Google Form 回傳網址
         const GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSenpCJdVZWJ4seiaz4GimXwasppPbnX3o1pLGyrnIMWaJ_sqw/formResponse";
@@ -874,7 +874,8 @@
             renderCart();
         }
 
-        function processCheckout() {
+        // ★★★ 結帳主流程 (含折扣檢查) ★★★
+        async function processCheckout() {
             if (cart.length === 0) { alert("請先加入商品"); return; }
 
             const name = document.getElementById('cust-name').value.trim();
@@ -889,6 +890,54 @@
 
             if(!name || !phone) { alert("請填寫姓名與電話"); return; }
             
+            // --- ★★★ 新增：折扣碼伺服器端檢查開始 ★★★ ---
+            if (appliedCoupon) {
+                // 檢查網址是否已設定
+                if (!TRAFFIC_SCRIPT_URL || TRAFFIC_SCRIPT_URL.includes("YOUR_ID_HERE")) {
+                    alert("系統錯誤：尚未設定後端檢查網址，請聯繫管理員。");
+                    return;
+                }
+
+                // 顯示檢查中狀態 (使用者體驗)
+                const submitBtn = document.getElementById('submit-btn');
+                const originalBtnText = submitBtn.innerText;
+                submitBtn.innerText = "驗證折扣資格中...";
+                submitBtn.disabled = true;
+
+                try {
+                    // 呼叫 Apps Script 進行檢查
+                    const checkUrl = TRAFFIC_SCRIPT_URL + "?action=checkDiscount&phone=" + encodeURIComponent(phone);
+                    const response = await fetch(checkUrl);
+                    const data = await response.json();
+
+                    if (data.used === true) {
+                        alert("【系統攔截】\n此電話號碼 (" + phone + ") 已經使用過折扣優惠，無法再次使用。\n\n系統將自動移除折扣碼，請重新確認金額後再結帳。");
+                        
+                        // 自動移除折扣碼
+                        appliedCoupon = null;
+                        document.getElementById('coupon-code').value = "";
+                        document.getElementById('coupon-msg').innerText = "";
+                        renderCart(); // 重新計算價格
+
+                        // 恢復按鈕並中斷結帳
+                        submitBtn.innerText = originalBtnText;
+                        submitBtn.disabled = false;
+                        return; 
+                    }
+                } catch (error) {
+                    console.error("驗證失敗:", error);
+                    // 選擇性：如果連線失敗，是否要擋下？為了不影響訂單，這裡僅記錄錯誤，暫不強制擋單
+                    // 若要嚴格執行，可取消註解下面這行：
+                    // alert("連線驗證失敗，請檢查網路或稍後再試。"); submitBtn.innerText = originalBtnText; submitBtn.disabled = false; return;
+                }
+
+                // 恢復按鈕 (如果驗證通過)
+                submitBtn.innerText = originalBtnText;
+                submitBtn.disabled = false;
+            }
+            // --- ★★★ 新增：折扣碼伺服器端檢查結束 ★★★ ---
+
+
             let finalDateStr = "";
             if(delivery === '自取') {
                 const slot = document.getElementById('pickup-slot-select').value;
