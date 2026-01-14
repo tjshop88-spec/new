@@ -273,8 +273,7 @@
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #00c300; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 10px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
-    <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=AW-17855729381">
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17855729381">
 </script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -283,8 +282,7 @@
 
   gtag('config', 'AW-17855729381');
 </script>
-    <!-- Event snippet for 網頁瀏覽 conversion page -->
-<script>
+    <script>
   gtag('event', 'conversion', {'send_to': 'AW-17855729381/ZCzuCKTg490bEOWdo8JC'});
 </script>
 
@@ -503,6 +501,10 @@
                     </a>
                     <span style="font-size: 0.9rem; font-weight: bold; color: #06c755;">ID: @817ytyld</span>
                 </div>
+
+                <div style="margin-top: 25px; font-size: 0.75rem;">
+                    <a href="javascript:void(0)" onclick="openRefundPolicy()" style="color: #bbb; text-decoration: underline;">退貨與退款政策 (Return & Refund Policy)</a>
+                </div>
             </div>
 
         </div>
@@ -580,6 +582,23 @@
 
         <a id="linepay-btn" href="#" class="pay-btn" style="display:none;">前往 LINE Pay 付款</a>
         <button onclick="window.location.reload()" class="pay-btn home-btn">返回首頁 / 再下一單</button>
+    </div>
+
+    <div id="refund-policy-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center;">
+        <div style="background: #fff; width: 90%; max-width: 500px; padding: 25px; border-radius: 10px; position: relative; max-height: 80vh; overflow-y: auto;">
+            <span onclick="closeRefundPolicy()" style="position: absolute; top: 10px; right: 15px; font-size: 1.5rem; cursor: pointer; color: #666;">&times;</span>
+            <h3 style="text-align: center; margin-bottom: 15px; border-bottom: 2px solid #00c300; padding-bottom: 10px; color: #2e7d32;">退貨與退款政策</h3>
+            <div style="line-height: 1.8; color: #444; font-size: 0.95rem;">
+                <p><strong>退貨期限：</strong><br>不接受退貨，但產品瑕疵可以退款。</p>
+                <div style="height: 10px;"></div>
+                <p><strong>退貨方式：</strong><br>請撥打電話 0972-005-078 聯繫。</p>
+                <div style="height: 10px;"></div>
+                <p><strong>退貨費用：</strong><br>若為產品瑕疵，由我方退款。</p>
+                <div style="height: 10px;"></div>
+                <p><strong>詳細政策說明：</strong><br>由於本產品屬於生鮮食品，不適用於 7 天鑑賞期。除商品本身有瑕疵或運送過程造成損壞外，一經拆封或食用，恕不接受退貨。</p>
+            </div>
+            <button onclick="closeRefundPolicy()" style="display: block; width: 100%; margin-top: 25px; padding: 12px; background: #00c300; color: white; border: none; border-radius: 25px; font-weight: bold; cursor: pointer;">關閉視窗</button>
+        </div>
     </div>
 
     <script>
@@ -1088,7 +1107,7 @@
             formData.append(FORM_FIELDS.date, finalDateStr);          
             formData.append(FORM_FIELDS.cups, totalCups);             
             formData.append(FORM_FIELDS.subtotal, productFinalPrice); 
-            formData.append(FORM_FIELDS.shipping, shippingFee);        
+            formData.append(FORM_FIELDS.shipping, shippingFee);       
             formData.append(FORM_FIELDS.totalPrice, finalAllPrice);
             formData.append(FORM_FIELDS.remarks, remarks);
             formData.append(FORM_FIELDS.orderId, orderId); 
@@ -1114,7 +1133,7 @@
             // ★★★ Google Ads 購買轉換追蹤 ★★★
             // 請將 'AW-17855729381/請在此填入您的購買轉換標籤' 替換成您實際的 Label
             gtag('event', 'conversion', {
-                'send_to': 'AW-17855729381/請在此填入您的購買轉換標籤', 
+                'send_to': 'AW-17855729381/ZCzuCKTg490bEOWdo8JC', 
                 'value': finalAllPrice,      // 傳送訂單金額
                 'currency': 'TWD',           // 幣別
                 'transaction_id': orderId    // 訂單編號 (防止重複計算)
@@ -1186,9 +1205,16 @@
             window.scrollTo(0, 0);
         }
 
+        // ★★★ 新增：控制彈窗顯示與隱藏的功能 ★★★
+        function openRefundPolicy() {
+            document.getElementById('refund-policy-modal').style.display = 'flex';
+        }
+
+        function closeRefundPolicy() {
+            document.getElementById('refund-policy-modal').style.display = 'none';
+        }
+
         init();
     </script>
 </body>
 </html>
-
-
