@@ -254,7 +254,7 @@
         .pay-btn { display: block; width: 100%; padding: 15px; background: #00c300; color: white; text-decoration: none; border-radius: 30px; font-weight: bold; margin-bottom: 15px; }
         .home-btn { background: #fff; color: #666; border: 1px solid #ddd; }
         
-        /* LINE 按鈕樣式 */
+        /* LINE 按鈕樣式 (頁面內與彈窗) */
         .line-btn-style {
             display: inline-block;
             background-color: #06c755;
@@ -268,6 +268,36 @@
             transition: 0.2s;
         }
         .line-btn-style:active { transform: scale(0.98); }
+
+        /* --- 新增：懸浮 LINE 加入好友按鈕 --- */
+        .floating-line-btn {
+            position: fixed;
+            bottom: 100px; /* 避開底部結帳欄位 (約80px高 + 間距) */
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background-color: #06c755;
+            border-radius: 50%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 998; /* 低於 bottom-bar (999) 和 loading (1000)，但高於內容 */
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            text-decoration: none;
+        }
+        .floating-line-btn:hover {
+            transform: scale(1.05);
+        }
+        .floating-line-btn:active {
+            transform: scale(0.95);
+        }
+        .floating-line-btn img {
+            width: 38px;
+            height: 38px;
+            object-fit: contain;
+        }
 
         #loading-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.8); z-index: 1000; justify-content: center; align-items: center; flex-direction: column; }
         .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #00c300; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 10px; }
@@ -295,6 +325,11 @@
     </div>
 
     <div id="shop-view">
+        
+        <a href="https://lin.ee/UHEkfgW" target="_blank" class="floating-line-btn" title="加入官方LINE">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/4/41/LINE_logo.svg" alt="LINE">
+        </a>
+
         <header>
             <img src="logo.jpg" alt="Logo" class="header-logo">
             <span>線上預訂</span>
@@ -1218,4 +1253,3 @@
     </script>
 </body>
 </html>
-
